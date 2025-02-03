@@ -1,4 +1,7 @@
+/*Индекс добавил так как использую колоку dt в between операциях. Что должно ускорить выполнение запросов.*/
 ALTER TABLE payment.operations ADD INDEX operations_dt_ind USING BTREE (dt)
+
+/*Внешние ключи добавил для проверки корректности данных*/
 ALTER TABLE payment.operations ADD CONSTRAINT operations_type_opers_FK FOREIGN KEY (id_type_oper) REFERENCES payment.type_opers(id_type_oper)
 ALTER TABLE payment.operations ADD CONSTRAINT operations_users_FK FOREIGN KEY (id_users) REFERENCES payment.users(id_users)
 ALTER TABLE payment.users ADD CONSTRAINT users_countries_FK FOREIGN KEY (id_country) REFERENCES payment.countries(id_country)
@@ -51,8 +54,7 @@ BEGIN
 		INTO nID_TYPE_OPER
 		FROM payment.type_opers
 		where NAME_OPER = vNAME_OPER;
-	
-	/*Считаю что сумма уже приходит в валюте пользователя*/
+		/*Считаю что сумма уже приходит в валюте пользователя*/
 	IF nMOVE = -1 THEN
 		IF nUSER_SUM_AMOUNT < nSUM_AMOUNT THEN
 			SELECT JSON_INSERT(vREPORT, '$.RESULT_TYPE', 'error', '$.RESULT_MESSAGE', 'User have not enough money') INTO vREPORT;
@@ -93,29 +95,33 @@ select @REPORT, @USER_SUM_BEFORE_OPER, @USER_SUM_AFTER_OPER;*/
 
 /*задание 2*/
 
-/* Возможно "репорт" означает, что нужно создать временную таблицу и положить туда данные, но из задания было не очень понятно.*/
+/* Возможно "отчет" означает, что нужно создать временную таблицу и положить туда данные, но из задания было не очень понятно.*/
+
+/* Пояснения относительно использования with. В Oracle я бы написал hint MATERIALIZED, что бы закэшировать в памяти результат подзапроса, так как после группировки количество строк будет максимум количество стран * количество операций - что приемлемо для кэша. Но насколько я понял MySQL всегда кэширует with. Соответственно дополнительных хинтов не нужно. Да и из похожих я нашел только hint SUBQUERY(MATERIALIZATION)), который судя по всему используется только для in вхождений. План запроса так же показал, что with вызывается только 1 раз.*/
 
 CREATE PROCEDURE financial_report(IN FROM_D datetime, IN TO_D datetime)
 BEGIN
-	with t as(SELECT c.name_country as country_name,
-			t.name_oper as oper_name,
-			round(sum(o.amount_oper) / cur.base_rate, 2) as amount,
-			round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_comiss,
-			round(sum(o.amount_oper) / cur.base_rate, 2) - round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_no_comiss
-		FROM payment.operations o
-		INNER JOIN payment.users u
-			ON o.id_user = u.id_user
-		INNER JOIN payment.currencies cur
-			ON u.id_currency = cur.id_currency
-		INNER JOIN payment.countries c 
-			ON u.id_country = c.id_country 
-		INNER JOIN payment.type_opers t 
-			ON o.id_type_oper = t.id_type_oper 
-		WHERE dt between FROM_D and TO_D
-		GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission),
-	s as (SElECT country_name, oper_name, sum(amount) as amount, sum(amount_comiss) as amount_comiss, sum(amount_no_comiss) as amount_no_comiss, 1 as order_country, 0 as order_total
+with t as(
+	SELECT country_name, oper_name, sum(amount) as amount, sum(amount_comiss) as amount_comiss, sum(amount_no_comiss) as amount_no_comiss, 1 as order_country, 0 as order_total
+			FROM(SELECT c.name_country as country_name,
+						t.name_oper as oper_name,
+						round(sum(o.amount_oper) / cur.base_rate, 2) as amount,
+						round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_comiss,
+						round(sum(o.amount_oper) / cur.base_rate, 2) - round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_no_comiss
+					FROM payment.operations o
+					INNER JOIN payment.users u
+						ON o.id_user = u.id_user
+					INNER JOIN payment.currencies cur
+						ON u.id_currency = cur.id_currency
+					INNER JOIN payment.countries c 
+						ON u.id_country = c.id_country 
+					INNER JOIN payment.type_opers t 
+						ON o.id_type_oper = t.id_type_oper 
+					WHERE dt between current_timestamp() - INTERVAL 10 DAY and current_timestamp()
+					GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission) c
+				GROUP BY country_name, oper_name),
+	s as (SELECT country_name, oper_name, amount, amount_comiss, amount_no_comiss, 1 as order_country, 0 as order_total
 			FROM t
-			GROUP BY country_name, oper_name
 		UNION ALL
 		SElECT country_name, 'TOTAL', sum(amount), sum(amount_comiss), sum(amount_no_comiss), 2 as order_country, 0 as order_total
 			FROM t
@@ -132,49 +138,47 @@ END
 
 /*задание 3*/
 
+/*Я бы еще подумал над тем, чтобы разбить таблицу operations_consolidation на партиции по наиболее часто используемым интервалам времени, допустим по дням, месяцам или неделям по аналогии с 6 заданием. Но не знаю нужно ли это было для этого задания.*/
+
 CREATE TABLE payment.operations_consolidation (
-	id_operation_cons BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-	country_name VARCHAR(50) DEFAULT NULL,
-	oper_name VARCHAR(255) DEFAULT NULL,
+	country_name VARCHAR(50) NOT NULL,
+	oper_name VARCHAR(255) NOT NULL,
 	amount DECIMAL(19, 5) NOT NULL,
 	amount_comiss DECIMAL(19, 5) NOT NULL,
 	amount_no_comiss DECIMAL(19, 5) NOT NULL,
 	dt TIMESTAMP NOT NULL,
-	PRIMARY KEY (id_operation_cons)
+	PRIMARY KEY (country_name,oper_name,dt)
 );
 
 ALTER TABLE payment.operations_consolidation ADD INDEX operations_consolidation_dt_ind USING BTREE (dt);
 
 CREATE PROCEDURE p_operations_consolidation()
 BEGIN
-	INSERT INTO payment.operations_consolidation(country_name, oper_name, amount, amount_comiss, amount_no_comiss, dt)
-	with t as 
-	(SELECT c.name_country as country_name,
-			t.name_oper as oper_name,
-			round(sum(o.amount_oper) / cur.base_rate, 2) as amount,
-			round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_comiss,
-			round(sum(o.amount_oper) / cur.base_rate, 2) - round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_no_comiss,
-			date(round(current_timestamp())) - INTERVAL 1 DAY as dt
-		FROM payment.operations o
-		INNER JOIN payment.users u
-			ON o.id_user = u.id_user
-		INNER JOIN payment.currencies cur
-			ON u.id_currency = cur.id_currency
-		INNER JOIN payment.countries c 
-			ON u.id_country = c.id_country 
-		INNER JOIN payment.type_opers t 
-			ON o.id_type_oper = t.id_type_oper 
-		WHERE dt between DATE(current_timestamp() - INTERVAL 1 DAY) and DATE(current_timestamp()) - INTERVAL 1 SECOND 
-		GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission),
-	s as(
-	SElECT country_name, oper_name, sum(amount) as amount, sum(amount_comiss) as amount_comiss, sum(amount_no_comiss) as amount_no_comiss, dt
-			FROM t
-			GROUP BY country_name, oper_name, dt)
+INSERT INTO payment.operations_consolidation(country_name, oper_name, amount, amount_comiss, amount_no_comiss, dt)
 	SELECT country_name, oper_name, amount, amount_comiss, amount_no_comiss, dt
-	from s
-	ON DUPLICATE KEY UPDATE amount = s.amount,
-							amount_comiss = s.amount_comiss,
-							amount_no_comiss = s.amount_no_comiss;
+		FROM (SELECT country_name, oper_name, sum(amount) as amount, sum(amount_comiss) as amount_comiss, sum(amount_no_comiss) as amount_no_comiss, dt
+			FROM (SELECT c.name_country as country_name,
+				t.name_oper as oper_name,
+				round(sum(o.amount_oper) / cur.base_rate, 2) as amount,
+				round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_comiss,
+				round(sum(o.amount_oper) / cur.base_rate, 2) - round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_no_comiss,
+				date(round(dt)) as dt
+			FROM payment.operations o
+			INNER JOIN payment.users u
+				ON o.id_user = u.id_user
+			INNER JOIN payment.currencies cur
+				ON u.id_currency = cur.id_currency
+			INNER JOIN payment.countries c 
+				ON u.id_country = c.id_country 
+			INNER JOIN payment.type_opers t 
+				ON o.id_type_oper = t.id_type_oper 
+			WHERE dt between DATE(current_timestamp() - INTERVAL 1 DAY) and DATE(current_timestamp()) - INTERVAL 1 SECOND 
+			GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission, date(round(dt))) c
+		GROUP BY country_name, oper_name, dt) t
+	ON DUPLICATE KEY UPDATE amount = t.amount,
+							amount_comiss = t.amount_comiss,
+							amount_no_comiss = t.amount_no_comiss;
+
 END
 
 CREATE EVENT e_operations_consolidation
@@ -188,6 +192,7 @@ DO
 /*задание 4*/
 
 CREATE PROCEDURE financial_report_cons(IN FROM_D datetime, IN TO_D datetime)
+financial_report_cons:
 BEGIN
 	
 	DECLARE FROM_FULL_D datetime;
@@ -197,55 +202,77 @@ BEGIN
 	DECLARE FROM_2_PERIOD_D datetime;
 	DECLARE TO_2_PERIOD_D datetime;
 	
-	IF (DATE(ROUND(FROM_D)) = FROM_D) THEN
-		set FROM_FULL_D := FROM_D;
-		set FROM_1_PERIOD_D := NULL;
-		SET TO_1_PERIOD_D := NULL;
-	ELSE
-		set FROM_FULL_D := DATE(FROM_D + INTERVAL 1 DAY);
-		set FROM_1_PERIOD_D := FROM_D;
-		SET TO_1_PERIOD_D := DATE(FROM_D + INTERVAL 1 DAY) - INTERVAL 1 SECOND;
+	/* Если дата начала больше даты окончания, то ничего не делаем*/
+	IF FROM_D > TO_D THEN
+		LEAVE financial_report_cons;
 	END IF;
 	
-	IF (DATE(ROUND(TO_D)) = TO_D) THEN
-		set TO_FULL_D := TO_D;
-		set FROM_2_PERIOD_D := NULL;
-		SET TO_2_PERIOD_D := NULL;
+	/* Проверяем что нет полных дней */
+	IF (DATE(ROUND(FROM_D)) = DATE(ROUND(TO_D))) THEN
+		SET FROM_1_PERIOD_D := FROM_D;
+		SET TO_1_PERIOD_D := TO_D;
 	ELSE
-		set TO_FULL_D := DATE(TO_D);
-		set FROM_2_PERIOD_D := DATE(TO_D) + INTERVAL 1 SECOND;
-		SET TO_2_PERIOD_D := TO_D;
-	END IF;
+	/* Если полные дни есть то заполняем их и остатки */
+		IF (DATE(ROUND(FROM_D)) = FROM_D) THEN
+			set FROM_FULL_D := FROM_D;
+			set FROM_1_PERIOD_D := NULL;
+			SET TO_1_PERIOD_D := NULL;
+		ELSE
+			set FROM_FULL_D := DATE(FROM_D + INTERVAL 1 DAY);
+			set FROM_1_PERIOD_D := FROM_D;
+			SET TO_1_PERIOD_D := DATE(FROM_D + INTERVAL 1 DAY) - INTERVAL 1 SECOND;
+			IF TO_1_PERIOD_D > TO_D THEN
+				SET TO_1_PERIOD_D := TO_D;
+			END IF;
+		END IF;
 	
-	select FROM_FULL_D, TO_FULL_D, FROM_1_PERIOD_D, TO_1_PERIOD_D, FROM_2_PERIOD_D, TO_2_PERIOD_D;
+		IF (DATE(ROUND(TO_D)) = TO_D) THEN
+			set TO_FULL_D := TO_D;
+			set FROM_2_PERIOD_D := NULL;
+			SET TO_2_PERIOD_D := NULL;
+		ELSE
+			set TO_FULL_D := DATE(TO_D) - INTERVAL 1 SECOND;
+			IF TO_1_PERIOD_D <> TO_D OR TO_1_PERIOD_D IS NULL THEN
+				set FROM_2_PERIOD_D := DATE(TO_D);
+				SET TO_2_PERIOD_D := TO_D;
+			END IF;
+		END IF;
+	END IF;
+		
+	/*Зануляем неполные периоды*/
+	IF FROM_FULL_D > TO_FULL_D THEN
+		set FROM_FULL_D := NULL;
+		SET TO_FULL_D := NULL;
+	END IF;
 	
 with t as 
-(SELECT country_name, oper_name, amount, amount_comiss, amount_no_comiss
+(SELECT country_name, oper_name, sum(amount) as amount, sum(amount_comiss) as amount_comiss, sum(amount_no_comiss) as amount_no_comiss
+			FROM (SELECT country_name, oper_name, amount, amount_comiss, amount_no_comiss
 			FROM payment.operations_consolidation
 			WHERE dt BETWEEN FROM_FULL_D AND TO_FULL_D
 			UNION ALL
 			SELECT c.name_country as country_name,
-					t.name_oper as oper_name,
-					round(sum(o.amount_oper) / cur.base_rate, 2) as amount,
-					round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_comiss,
-					round(sum(o.amount_oper) / cur.base_rate, 2) - round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_no_comiss
-				FROM payment.operations o
-				INNER JOIN payment.users u
-					ON o.id_user = u.id_user
-				INNER JOIN payment.currencies cur
-					ON u.id_currency = cur.id_currency
-				INNER JOIN payment.countries c 
-					ON u.id_country = c.id_country 
-				INNER JOIN payment.type_opers t 
-					ON o.id_type_oper = t.id_type_oper 
-				WHERE dt between FROM_1_PERIOD_D and TO_1_PERIOD_D 
-					OR dt between FROM_2_PERIOD_D and TO_2_PERIOD_D
-				GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission),
-	s as (SElECT country_name, oper_name, sum(amount) as amount, sum(amount_comiss) as amount_comiss, sum(amount_no_comiss) as amount_no_comiss, 1 as order_country, 0 as order_total
+						t.name_oper as oper_name,
+						round(sum(o.amount_oper) / cur.base_rate, 2) as amount,
+						round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_comiss,
+						round(sum(o.amount_oper) / cur.base_rate, 2) - round(round(sum(o.amount_oper) / cur.base_rate, 2) * t.comission / 100, 2) as amount_no_comiss
+					FROM payment.operations o
+					INNER JOIN payment.users u
+						ON o.id_user = u.id_user
+					INNER JOIN payment.currencies cur
+						ON u.id_currency = cur.id_currency
+					INNER JOIN payment.countries c 
+						ON u.id_country = c.id_country 
+					INNER JOIN payment.type_opers t 
+						ON o.id_type_oper = t.id_type_oper 
+					WHERE dt between FROM_1_PERIOD_D and TO_1_PERIOD_D 
+						OR dt between FROM_2_PERIOD_D and TO_2_PERIOD_D
+					GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission) c 
+				GROUP BY country_name, oper_name),
+	s as (SELECT country_name, oper_name, amount, amount_comiss, amount_no_comiss, 1 as order_country, 0 as order_total
 			FROM t
-			GROUP BY country_name, oper_name
 		UNION ALL
-		SElECT country_name, 'TOTAL', sum(amount), sum(amount_comiss), sum(amount_no_comiss), 2 as order_country, 0 as order_total
+		SELECT country_name, 'TOTAL', sum(amount), sum(amount_comiss), sum(amount_no_comiss), 2 as order_country, 0 as order_total
 			FROM t
 			GROUP BY country_name
 		UNION ALL 
@@ -276,7 +303,7 @@ BEGIN
 			ON u.id_country = c.id_country 
 		INNER JOIN payment.type_opers t 
 			ON o.id_type_oper = t.id_type_oper 
-		WHERE dt between current_timestamp() - INTERVAL 1 DAY and current_timestamp()
+		WHERE dt between FROM_D and TO_D
 			AND u.id_user = USER_ID
 		GROUP BY t.name_oper, cur.base_rate, t.comission),
 	s as (SElECT oper_name, amount, amount_comiss, amount_no_comiss,0 as order_total
@@ -299,7 +326,6 @@ BEGIN
 	DECLARE vdate varchar(20);
 	DECLARE vpartition varchar(20);
 	DECLARE done INT DEFAULT FALSE;
-	DECLARE vTABLE_NAME varchar(40);
 	
 	DECLARE curs CURSOR FOR SELECT 
 		DATE_FORMAT(dt, "%Y-%m-%d 00:00:00"),
@@ -311,10 +337,8 @@ BEGIN
 		ORDER BY dt;
 
 	DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
-
-	SET vTABLE_NAME := 'log_users';
 	
-	SET @script := concat('ALTER TABLE ',vTABLE_NAME,' PARTITION BY RANGE ( UNIX_TIMESTAMP(dt) ) (');
+	SET @script := 'ALTER TABLE log_users PARTITION BY RANGE ( UNIX_TIMESTAMP(dt) ) (';
 	
 	OPEN curs;
 	
@@ -359,6 +383,7 @@ BEGIN
 	
 	DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
+	/*Можно сделать этот параметр входным для процедуры и получится универсальная*/
 	SET vTABLE_NAME := 'log_users';
 	SET nCOUNTER := 0;
 	SET nMAX := 2;
