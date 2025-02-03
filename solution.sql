@@ -84,8 +84,7 @@ BEGIN
 	INSERT INTO payment.log_users
 		(idUser, idAction, Params)
 		VALUES(nID_USER, nID_TYPE_OPER, vREPORT);
-	
-	
+
 END
 
 /*CALL operation_commit (1, 100, 'deposit', 
