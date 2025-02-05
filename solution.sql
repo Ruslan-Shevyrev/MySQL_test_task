@@ -116,7 +116,7 @@ with t as(
 						ON u.id_country = c.id_country 
 					INNER JOIN payment.type_opers t 
 						ON o.id_type_oper = t.id_type_oper 
-					WHERE dt between current_timestamp() - INTERVAL 10 DAY and current_timestamp()
+					WHERE dt BETWEEN FROM_D and TO_D
 					GROUP BY c.name_country, t.name_oper, cur.base_rate, t.comission) c
 				GROUP BY country_name, oper_name),
 	s as (SELECT country_name, oper_name, amount, amount_comiss, amount_no_comiss, 1 as order_country, 0 as order_total
