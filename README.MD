@@ -10,6 +10,20 @@
 
 *Операции пользователей*
 
+Содержит в себе список денежных операций пользователей финансовго сервиса
+
+'''
+CREATE TABLE payment.operations (
+	id_operation BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	dt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+id_user INT UNSIGNED NOT NULL,
+	id_type_oper SMALLINT UNSIGNED NOT NULL,
+move TINTINT NOT NULL COMMENT 'направление движения (-1: списание со счёта, 1: начисление на счёт)',
+	amount_oper DECIMAL(19, 5) NOT NULL COMMENT 'Сумма операции в валюте пользователя',
+	PRIMARY KEY (id_operation)
+) ENGINE = INNODB;
+'''
+
 <table>
 	<tr>
 		<td valign="center" width="49%"><img src="https://github.com/Ruslan-Shevyrev/Ruslan-Shevyrev/blob/main/logoRS/logo_mini.gif" title="logo"></td>
