@@ -8,7 +8,6 @@
 
 ### Стукрутра таблиц:
 
-
 ***Операции пользователей***
 
 Содержит в себе список денежных операций пользователей финансовго сервиса
@@ -24,7 +23,6 @@ move TINYINT NOT NULL COMMENT 'направление движения (-1: сп
 	PRIMARY KEY (id_operation)
 ) ENGINE = INNODB;
 ```
-
 
 ***Справочник типов операций***
 
@@ -42,6 +40,25 @@ CREATE TABLE payment.type_opers (
 	name_oper VARCHAR(255) DEFAULT NULL COMMENT 'Название операции',
 	comission DECIMAL(5, 2) DEFAULT 0.00 COMMENT 'Процент комиссии за операцию',
 	PRIMARY KEY (id_type_oper)
+) ENGINE = INNODB;
+```
+
+***Логи действий пользователя***
+
+Содержит в себе список всевозможных действий пользователей финансового сервиса.  
+Наример:
+- Пополнение счета (idAction 1);
+- Вывод со счета (idAction 2);
+- Авторизация в ситеме (idAction 3);
+- Просмотр истории операций (idAction 4);
+(поле в таблице idAction)
+
+```
+CREATE TABLE payment.log_users (
+	dt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	idUser INT UNSIGNED NOT NULL,
+	idAction INT UNSIGNED NOT NULL,
+	Params JSON DEFAULT NULL
 ) ENGINE = INNODB;
 ```
 
