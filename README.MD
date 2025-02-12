@@ -18,9 +18,28 @@ CREATE TABLE payment.operations (
 	dt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 id_user INT UNSIGNED NOT NULL,
 	id_type_oper SMALLINT UNSIGNED NOT NULL,
-move TINTINT NOT NULL COMMENT 'направление движения (-1: списание со счёта, 1: начисление на счёт)',
+move TINYINT NOT NULL COMMENT 'направление движения (-1: списание со счёта, 1: начисление на счёт)',
 	amount_oper DECIMAL(19, 5) NOT NULL COMMENT 'Сумма операции в валюте пользователя',
 	PRIMARY KEY (id_operation)
+) ENGINE = INNODB;
+```
+
+*Справочник типов операций*
+
+Содержит в себе список всевозможных типов операций пользователей.  Поле id_type_oper в таблице payment.operations
+Наример:
+- Депозит средств на счет (Deposit)
+- Снятие средств со счета (Withdrawal)
+- Возврат средств (Refund)
+- Штрафное списание (Penalty Charge)
+
+
+```
+CREATE TABLE payment.type_opers (
+	id_type_oper SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	name_oper VARCHAR(255) DEFAULT NULL COMMENT 'Название операции',
+	comission DECIMAL(5, 2) DEFAULT 0.00 COMMENT 'Процент комиссии за операцию',
+	PRIMARY KEY (id_type_oper)
 ) ENGINE = INNODB;
 ```
 
