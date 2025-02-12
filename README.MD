@@ -12,7 +12,7 @@
 
 Содержит в себе список денежных операций пользователей финансовго сервиса
 
-'''
+```
 CREATE TABLE payment.operations (
 	id_operation BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 	dt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -22,7 +22,7 @@ move TINTINT NOT NULL COMMENT 'направление движения (-1: сп
 	amount_oper DECIMAL(19, 5) NOT NULL COMMENT 'Сумма операции в валюте пользователя',
 	PRIMARY KEY (id_operation)
 ) ENGINE = INNODB;
-'''
+```
 
 <table>
 	<tr>
