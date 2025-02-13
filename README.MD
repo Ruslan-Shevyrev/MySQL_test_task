@@ -93,6 +93,18 @@ CREATE TABLE payment.currencies (
 *Примечание для “base_rate”: чтобы получить эквивалент валюты в рублях, достаточно разделить базовую валюту на “base_rate”. Пример: валюта - EUR, base_rate - 0,010119000. 1 EUR / 0,010119000 = 98,8240 RUB*
 
 
+***Справочник стран***
+
+Содержит в себе список всех возможных стран. Используется как свойство пользователя
+
+```
+CREATE TABLE payment.countries (
+	id_country SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	name_country VARCHAR(50) DEFAULT NULL,
+	PRIMARY KEY (id_country)
+) ENGINE = INNODB;
+```
+
 <table>
 	<tr>
 		<td valign="center" width="49%"><img src="https://github.com/Ruslan-Shevyrev/Ruslan-Shevyrev/blob/main/logoRS/logo_mini.gif" title="logo"></td>
