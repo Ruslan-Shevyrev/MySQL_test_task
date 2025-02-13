@@ -62,6 +62,21 @@ CREATE TABLE payment.log_users (
 ) ENGINE = INNODB;
 ```
 
+***Таблица с пользователями финансового сервиса***
+
+
+Содержит в себе список пользователей, с их свойствами, пользователи выполняют денежные операции на сервисе финансов.
+
+```
+CREATE TABLE payment.users (
+	id_user INT UNSIGNED NOT NULL AUTO_INCREMENT,
+user_balance DECIMAL(14, 2) DEFAULT 0.00 COMMENT ‘Текущий баланс в валюте игрока’',
+	id_currency SMALLINT UNSIGNED NOT NULL,
+	id_country SMALLINT UNSIGNED NOT NULL,
+	PRIMARY KEY (id_user)
+) ENGINE = INNODB;
+```
+
 <table>
 	<tr>
 		<td valign="center" width="49%"><img src="https://github.com/Ruslan-Shevyrev/Ruslan-Shevyrev/blob/main/logoRS/logo_mini.gif" title="logo"></td>
