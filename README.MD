@@ -105,6 +105,15 @@ CREATE TABLE payment.countries (
 ) ENGINE = INNODB;
 ```
 
+***Аннотация к таблицам и хранящимся в них данным:***
+
+1. Архитектура БД финансового сервиса, над которым вам предстоит работать, обрабатывает большое количество транзакций в режиме реального времени.
+2. Таблица payment.operations содержит от 5 до 10 миллионов строк в день и хранит в себе данные за несколько лет.
+3. Таблица payment.users содержит записи о 7 миллионах пользователей финансового сервиса.
+4. Таблица payment.log_users содержит от 5 до 10 миллионов строк в день и хранит в себе данные за 10 лет.
+5. Таблицы payment.type_opers, payment.currencies, payment.currencies  - справочники с количеством записей до 500.
+
+
 <table>
 	<tr>
 		<td valign="center" width="49%"><img src="https://github.com/Ruslan-Shevyrev/Ruslan-Shevyrev/blob/main/logoRS/logo_mini.gif" title="logo"></td>
