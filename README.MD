@@ -77,6 +77,22 @@ user_balance DECIMAL(14, 2) DEFAULT 0.00 COMMENT ‘Текущий баланс 
 ) ENGINE = INNODB;
 ```
 
+***Справочник валют***
+
+Содержит в себе список всех возможных валют с курсами к рублю. Используется как свойство пользователя.
+
+```
+CREATE TABLE payment.currencies (
+	id_currency SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	name_currency VARCHAR(255) DEFAULT NULL COMMENT 'ISO код валюты (EUR / USD / BTC / TON ...)',
+	base_rate DECIMAL(15, 5) DEFAULT NULL COMMENT 'Курс к рублю',
+	PRIMARY KEY (id_currency)
+) ENGINE = INNODB;
+```
+
+*Примечание для “base_rate”: чтобы получить эквивалент валюты в рублях, достаточно разделить базовую валюту на “base_rate”. Пример: валюта - EUR, base_rate - 0,010119000. 1 EUR / 0,010119000 = 98,8240 RUB*
+
+
 <table>
 	<tr>
 		<td valign="center" width="49%"><img src="https://github.com/Ruslan-Shevyrev/Ruslan-Shevyrev/blob/main/logoRS/logo_mini.gif" title="logo"></td>
